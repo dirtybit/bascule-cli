@@ -11,6 +11,9 @@
   "bin": {
     "bascule-cli": "./index.js"
   },
+  "engines" : {
+    "node" : ">=8.0.0"
+  },
   "dependencies": {
     "bytes": "^3.0.0",
     "glob": "^7.1.2",
