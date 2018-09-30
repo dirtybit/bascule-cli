@@ -53,7 +53,7 @@ Promise.all([
 ]).then(([repo, sha, files]) => {
     Promise.all(files.map(entry => (
         utils.generateBundleStats(entry.path).then(stats => {
-            delete stats["<unmapped>"];
+            delete stats.files["<unmapped>"];
 
             return Object.assign(entry, { stats });
         }).catch(err => {
