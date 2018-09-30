@@ -1,16 +1,24 @@
-const fs = require("mz/fs");
+const util = require("util");
+const fs = require("fs");
 const bytes = require("bytes");
 const glob = require("glob");
 const gzipSize = require("gzip-size");
+const tmp = require("tmp");
 const parseGitConfig = require("parse-git-config");
 const { spawn } = require("child_process");
 
+const fsClose = util.promisify(fs.close);
+const fsOpen = util.promisify(fs.open);
+const fsReadFile = util.promisify(fs.readFile);
+const fsStat = util.promisify(fs.stat);
+const tmpName = util.promisify(tmp.tmpName);
+
 function getFileSize(path, gzipped = false) {
     if (gzipped) {
-        return fs.readFile(path, "utf8").then(gzipSize);
+        return fsReadFile(path, "utf8").then(gzipSize);
     }
 
-    return fs.stat(path).then(stats => stats.size);
+    return fsStat(path).then(stats => stats.size);
 }
 
 function execCommand(command) {
@@ -64,7 +72,32 @@ module.exports = {
         })).then(results => results.reduce((prev, cur) => prev.concat(cur), []));
     },
     generateBundleStats(filepath) {
-        return execCommand(`source-map-explorer --json ${filepath}`).then(output => JSON.parse(output));
+        return new Promise((resolve, reject) => {
+            tmpName().then(name =>
+                fsOpen(name, "a").then(fd => ({
+                    fd,
+                    name
+                }))
+            ).then(({ fd, name }) => {
+                const proc = spawn("/bin/sh", ["-o", "pipefail", "-c", `source-map-explorer --json ${filepath}`], {
+                    stdio: ["inherit", fd, "inherit"]
+                });
+
+                proc.on("error", error => {
+                    reject(error);
+                }).on("close", code => {
+                    if (code) {
+                        reject(new Error(`source-map-explorer exited with code ${code}`));
+                    } else {
+                        fsClose(fd).then(
+                            () => fsReadFile(name)
+                        ).then(
+                            buf => resolve(JSON.parse(buf.toString()))
+                        );
+                    }
+                });
+            });
+        });
     },
     getRepoName() {
         return new Promise((resolve, reject) => {
