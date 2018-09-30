@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const request = require("request-promise-native");
 const utils = require("./utils");
 const { pkg } = require("read-pkg-up").sync();
